@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Functional data analysis of Tecator data set"
 authors = ["Nicholas Gaubatz"]
 readme = "README.md"
-package-mode = false
+packages = [
+    { include = "tecatorfda", from = "src" }
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11"
