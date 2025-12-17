@@ -18,7 +18,7 @@ def fetch_tecator_fat() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
     X, y = fetch_tecator(return_X_y=True, as_frame=True)
     grid = X.iloc[:, 0].values.grid_points[0]
     wavelengths = pd.DataFrame(X.iloc[:, 0].values.data_matrix.squeeze(), columns=grid)
-    fat = pd.DataFrame(y["fat"].values)
+    fat = pd.DataFrame(y["fat"].values, columns=["y"])
 
     return wavelengths, fat, grid
 
@@ -28,7 +28,7 @@ def generate_tecator_fat(location: str | None = None) -> None:
 
     Args:
         location (str, optional): The directory to which the data are saved.
-            Defaults to "data" in the repo root.
+            If None, uses "data" in the repo root.
     """
     # If no directory is given, default to <repo_root>/data.
     if location is None:
@@ -61,3 +61,27 @@ def generate_tecator_fat(location: str | None = None) -> None:
     fat_df.to_csv(location / "fat.csv", index=False)
     with open(location / "metadata.json", "w") as f:
         json.dump(grid_metadata, f, indent=4)
+
+
+def load_tecator_fat(
+    location: str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, list, str]:
+    """Load the Tecator data set from a pre-saved location.
+
+    Args:
+        location (str | None, optional): The directory in which the data are saved.
+            If None, uses "data" in the repo root.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame, list, str]: Tecator data, fat data,
+            the wavelength grid, and the wavelength unit.
+    """
+    tecator_df = pd.read_csv("../data/tecator.csv")
+    fat_df = pd.read_csv("../data/fat.csv")
+
+    with open("../data/metadata.json", "r") as f:
+        metadata = json.load(f)
+    wavelength_grid = metadata["wavelengths"]
+    wavelength_unit = metadata["wavelength_unit"]
+
+    return tecator_df, fat_df, wavelength_grid, wavelength_unit
