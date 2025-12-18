@@ -3,6 +3,7 @@ import pickle
 
 from tecatorfda.ols_models import (
     perform_ols,
+    perform_ols_cv,
     perform_ols_holdout,
     plot_and_save_diagnostics,
 )
@@ -44,7 +45,7 @@ def main():
     }
 
     for key, value in all_results.items():
-        with open(data_path / key, "wb") as f:
+        with open(results_path / key, "wb") as f:
             pickle.dump(value, f)
 
     ### Save some important plots to data/01_ols/plots.
@@ -54,6 +55,13 @@ def main():
 
     for key in all_results.keys():
         plot_and_save_diagnostics(all_results[key], plots_path / (key + ".png"))
+
+    ### Run OLS repeated CV and save.
+
+    results_cv = perform_ols_cv(tecator_df.values, fat_df.values, random_state=0)
+
+    with open(results_path / "ols_cv", "wb") as f:
+        pickle.dump(results_cv, f)
 
 
 if __name__ == "__main__":

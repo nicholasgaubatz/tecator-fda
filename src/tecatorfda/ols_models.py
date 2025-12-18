@@ -10,7 +10,9 @@ from sklearn.metrics import (
     mean_absolute_error,
     mean_absolute_percentage_error,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RepeatedKFold, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 @dataclass
@@ -21,6 +23,7 @@ class ScikitLearnResults:
     split: str = field(metadata={"desc": "Train, test, or full data"})
     random_state: int | None = field(metadata={"desc": "Random state of model"})
     predicted: np.ndarray
+    residuals: np.ndarray
     r2_score: float = field(metadata={"desc": "r2_score"})
     mse: float = field(metadata={"desc": "Mean squared error"})
     mae: float = field(metadata={"desc": "Mean absolute error"})
@@ -29,6 +32,21 @@ class ScikitLearnResults:
     condition_number: float | None = field(
         default=None, metadata={"desc": "Condition number"}
     )
+    cooks_distances: np.ndarray | None = None
+
+
+@dataclass
+class ScikitLearnCVResults:
+    X: np.ndarray
+    y: np.ndarray
+    model: BaseEstimator = field(metadata={"desc": "BaseEstimator"})
+    random_state: int | None = field(metadata={"desc": "Random state of model"})
+    r2_scores: np.ndarray
+    r2_mean: float = field(metadata={"desc": "Mean R^2 of CV fits"})
+    r2_std: float = field(metadata={"desc": "Standard deviation of CV fits"})
+    mse: np.ndarray
+    mae: np.ndarray
+    mape: np.ndarray
 
 
 def print_attributes(obj: object) -> None:
@@ -60,13 +78,17 @@ def plot_and_save_diagnostics(results: ScikitLearnResults, filepath: str) -> Non
         alpha=0.5,
     )
     ax[0].scatter(results.y, results.predicted, s=1)
-    ax[0].set_title(rf"Train actual vs. predicted ($R^{2}={results.r2_score:.4f}$)")
+    ax[0].set_title(
+        rf"{results.split.capitalize()} actual vs. predicted, state={results.random_state} ($R^{2}={results.r2_score:.4f}$)"
+    )
     ax[0].set_xlabel("Actual")
     ax[0].set_ylabel("Predicted")
 
     ax[1].plot([min(results.y), max(results.y)], [0, 0], c="black", alpha=0.5)
     ax[1].scatter(results.y, results.y - results.predicted, s=1)
-    ax[1].set_title(rf"Train residuals ($R^{2}={results.r2_score:.4f}$)")
+    ax[1].set_title(
+        rf"{results.split.capitalize()} residuals, state={results.random_state}"
+    )
     ax[1].set_xlabel("Predicted")
     ax[1].set_ylabel("Residual")
 
@@ -101,7 +123,7 @@ def leverage_scores(X: np.ndarray) -> np.ndarray:
 
 
 def condition_number(X: np.ndarray) -> float:
-    """Given a data set, compute the condition number, or measure of multicollinearity.
+    """Given a data set X, compute the condition number of X'X for multicollinearity.
 
     Args:
         X (np.ndarray): The predictor matrix.
@@ -109,9 +131,14 @@ def condition_number(X: np.ndarray) -> float:
     Returns:
         float: The condition number, or ratio of largest to smallest eigenvalue.
     """
-    singular_values = np.linalg.svd(X, compute_uv=False)
+    eigenvalues = np.linalg.eig(X.T @ X).eigenvalues
 
-    return singular_values.max() / singular_values.min()
+    return eigenvalues.max() / eigenvalues.min()
+
+
+def cooks_distances():
+    # TODO
+    pass
 
 
 def perform_ols(X: np.ndarray, y: np.ndarray) -> ScikitLearnResults:
@@ -125,8 +152,8 @@ def perform_ols(X: np.ndarray, y: np.ndarray) -> ScikitLearnResults:
         ScikitLearnResults: Results.
     """
     y.reshape(-1, 1)
-    # Fit. Don't need to standardize for OLS.
-    lr_model = LinearRegression()
+    # Fit. Don't need to standardize for OLS, but we do for consistency later.
+    lr_model = make_pipeline(StandardScaler(), LinearRegression())
     lr_model.fit(X, y)
 
     # Predict.
@@ -140,6 +167,7 @@ def perform_ols(X: np.ndarray, y: np.ndarray) -> ScikitLearnResults:
         split="full",
         random_state=None,
         predicted=predicted,
+        residuals=y - predicted,
         r2_score=r2_score(y, predicted),
         mse=mean_squared_error(y, predicted),
         mae=mean_absolute_error(y, predicted),
@@ -168,8 +196,8 @@ def perform_ols_holdout(
     # Split the data.
     X_train, X_test, y_train, y_test = holdout_split80(X, y, random_state)
 
-    # Fit. Don't need to standardize for OLS.
-    lr_model = LinearRegression()
+    # Fit. Don't need to standardize for OLS, but we do for consistency later.
+    lr_model = make_pipeline(StandardScaler(), LinearRegression())
     lr_model.fit(X_train, y_train)
 
     # Predict.
@@ -184,6 +212,7 @@ def perform_ols_holdout(
         split="train",
         random_state=random_state,
         predicted=predicted_train,
+        residuals=y_train - predicted_train,
         r2_score=r2_score(y_train, predicted_train),
         mse=mean_squared_error(y_train, predicted_train),
         mae=mean_absolute_error(y_train, predicted_train),
@@ -200,6 +229,7 @@ def perform_ols_holdout(
         split="test",
         random_state=random_state,
         predicted=predicted_test,
+        residuals=y_test - predicted_test,
         r2_score=r2_score(y_test, predicted_test),
         mse=mean_squared_error(y_test, predicted_test),
         mae=mean_absolute_error(y_test, predicted_test),
@@ -212,4 +242,35 @@ def perform_ols_holdout(
 def perform_ols_cv(
     X: np.ndarray, y: np.ndarray, random_state: int | None = None
 ) -> None:
-    pass
+    y.reshape(-1, 1)
+    # Perform 10-fold cross-validation 10 times.
+    lr_model = make_pipeline(StandardScaler(), LinearRegression())
+    cv = RepeatedKFold(n_splits=10, n_repeats=10, random_state=random_state)
+
+    # Evaluate all the metrics.
+    r2_scores = cross_val_score(lr_model, X, y, cv=cv, scoring="r2")
+    mse_scores = cross_val_score(
+        lr_model, X, y, cv=cv, scoring="neg_mean_squared_error"
+    )
+    mae_scores = cross_val_score(
+        lr_model, X, y, cv=cv, scoring="neg_mean_absolute_error"
+    )
+    mape_scores = cross_val_score(
+        lr_model, X, y, cv=cv, scoring="neg_mean_absolute_percentage_error"
+    )
+
+    # Define the results.
+    results = ScikitLearnCVResults(
+        X=X,
+        y=y,
+        model=lr_model,
+        random_state=random_state,
+        r2_scores=r2_scores,
+        r2_mean=r2_scores.mean(),
+        r2_std=r2_scores.std(),
+        mse=mse_scores,
+        mae=mae_scores,
+        mape=mape_scores,
+    )
+
+    return results
