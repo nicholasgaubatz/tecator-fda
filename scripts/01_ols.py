@@ -45,7 +45,7 @@ def main():
     }
 
     for key, value in all_results.items():
-        with open(results_path / key, "wb") as f:
+        with open(results_path / (key + ".pkl"), "wb") as f:
             pickle.dump(value, f)
 
     ### Save some important plots to data/01_ols/plots.
@@ -60,7 +60,7 @@ def main():
 
     results_cv = perform_ols_cv(tecator_df.values, fat_df.values, random_state=0)
 
-    with open(results_path / "ols_cv", "wb") as f:
+    with open(results_path / "ols_cv.pkl", "wb") as f:
         pickle.dump(results_cv, f)
 
 

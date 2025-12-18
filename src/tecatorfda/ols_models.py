@@ -272,5 +272,41 @@ def perform_ols_cv(
         mae=mae_scores,
         mape=mape_scores,
     )
-
     return results
+
+
+def compute_ridge_paths(X: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """_summary_
+
+    Args:
+        X (np.ndarray): _description_
+        y (np.ndarray): _description_
+
+    Returns:
+        np.ndarray: _description_
+    """
+    y.reshape(-1, 1)
+
+    # Define an alpha parameter log-space.
+    # alphas = np.logspace(-10, 10, 161)
+
+    # Run ridge regression after standardizing all the variables.
+    # coefs = []
+
+
+def plot_and_save_ols_ridge_cv_boxplots(
+    ols_scores: np.ndarray, ridge_scores: np.ndarray, filepath: str
+):
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+
+    ax.boxplot([ols_scores, ridge_scores], tick_labels=["OLS", "Ridge"])
+    ax.set_title("Repeated CV $R^{2}$ scores")
+    ax.set_ylabel("$R^{2}$")
+    ax.set_yticks(np.arange(0.5, 1.05, 0.05))
+    ax.grid(
+        axis="y",
+    )
+
+    fig.tight_layout()
+    fig.savefig(filepath, dpi=450, bbox_inches="tight")
+    plt.close(fig)
