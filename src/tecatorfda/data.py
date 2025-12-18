@@ -51,6 +51,8 @@ def generate_tecator_fat(location: str | None = None) -> None:
     grid_metadata = {
         "dataset": "Tecator",
         "source": "https://lib.stat.cmu.edu/datasets/tecator",
+        "n_samples": wavelength_df.shape[0],
+        "n_grid": wavelength_df.shape[1],
         "wavelengths": grid.tolist(),
         "wavelength_unit": "nm",
         "notes": "100-point discretization per sample",
@@ -76,10 +78,23 @@ def load_tecator_fat(
         tuple[pd.DataFrame, pd.DataFrame, list, str]: Tecator data, fat data,
             the wavelength grid, and the wavelength unit.
     """
-    tecator_df = pd.read_csv("../data/tecator.csv")
-    fat_df = pd.read_csv("../data/fat.csv")
+    # If no directory is given, default to <repo_root>/data.
+    if location is None:
+        # Get the directory containing this file.
+        src_dir = Path(__file__).parent
+        # Assume repo root is parent of parent of src.
+        repo_root = src_dir.parent.parent
+        # Default data directory.
+        location = repo_root / "data"
+    else:
+        location = Path(location)
 
-    with open("../data/metadata.json", "r") as f:
+    location = location.resolve()
+
+    tecator_df = pd.read_csv(location / "tecator.csv")
+    fat_df = pd.read_csv(location / "fat.csv")
+
+    with open(location / "metadata.json", "r") as f:
         metadata = json.load(f)
     wavelength_grid = metadata["wavelengths"]
     wavelength_unit = metadata["wavelength_unit"]
