@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field, fields
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,7 +63,7 @@ def print_attributes(obj: object) -> None:
             print(f"{desc}: {value}")
 
 
-def plot_and_save_diagnostics(results: ScikitLearnResults, filepath: str) -> None:
+def plot_and_save_diagnostics(results: ScikitLearnResults, filepath: Path) -> None:
     """Plot actual vs. predicted values and residuals side-by-side.
 
     Args:
