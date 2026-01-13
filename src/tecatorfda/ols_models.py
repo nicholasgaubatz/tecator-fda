@@ -296,7 +296,7 @@ def compute_ridge_paths(X: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def plot_and_save_ols_ridge_cv_boxplots(
-    ols_scores: np.ndarray, ridge_scores: np.ndarray, filepath: str
+    ols_scores: np.ndarray, ridge_scores: np.ndarray, filepath: Path
 ):
     fig, ax = plt.subplots(1, 1, figsize=(5, 5))
 
