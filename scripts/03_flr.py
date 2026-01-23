@@ -16,12 +16,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeCV
 
 from tecatorfda.data import load_tecator_fat
+from tecatorfda.fda_analysis import (
+    save_binned_r2pred_vs_df,
+    save_heatmap_max_r2pred,
+    save_r2pred_vs_df,
+    save_r2pred_vs_lambda_by_Kbeta,
+    save_small_multiples_heatmaps_from_df,
+    sweep_fda_to_tidy_df,
+)
 from tecatorfda.fda_models import (
     repeated_cv_flr,
     plot_and_save_ols_ridge_flr_cv_boxplots,
-)
-from tecatorfda.ols_models import (
-    plot_and_save_ols_ridge_cv_boxplots,
 )
 
 def main():
@@ -36,13 +41,75 @@ def main():
     data_path = Path(__file__).parent.parent / "data" / "03_flr"
     data_path.mkdir(parents=True, exist_ok=True)
 
-    # If we don't already have 10-repeated 10-fold CV results saved, generate them.
+    # Define the paths we use throughout.
+    analysis_path = data_path / "analysis_results"
     results_path = data_path / "repeated_cv_results"
     results_file = results_path / "results.pkl"
+    plots_path = data_path / "plots"
+
+    # If we don't already have results saved, generate them.
     if not results_file.exists():
         # Create this directory.
+        analysis_path.mkdir(parents=True, exist_ok=True)
         results_path.mkdir(parents=True, exist_ok=True)
 
+        # Create a plots directory.
+        plots_path.mkdir(parents=True, exist_ok=True)
+
+        ### Basis representation with smoothing parameter analysis.
+
+        # User-defined parameters.
+        KX_values = np.arange(5, 50, 5)
+        Kbeta_values = np.arange(5, 50, 5)
+        log10_lams = np.arange(-15, 5, 1.)
+
+        # Consequences.
+        lam_values = 10 ** log10_lams
+        
+        # Perform a hyperparameter sweep: K_X, K_beta, lambda.
+        tidy_df = sweep_fda_to_tidy_df(
+            tecator_fdatagrid=tecator_fdatagrid,
+            y=fat,
+            KX_values=KX_values,
+            Kbeta_values=Kbeta_values,
+            lam_values=lam_values,
+            cache_matrices=True,
+            include_timing=True,
+            verbose_progress=True,
+        )
+
+        # Save this tidy_df.
+        tidy_df.to_csv(analysis_path / "hyperparameter_sweep.csv", index=False)
+
+        # Plot heatmaps for predictive R^2: each plot highlights a fixed K_X, and we
+        # color the 2-dimensional (K_beta, log_lambda) grid.
+        save_small_multiples_heatmaps_from_df(tidy_df, value_col="R2_pred", cmap="seismic", filepath=plots_path / "R2_heatmaps.png")
+
+        # Plot predictive R^2 for each K_X based on K_beta and lambda.
+        save_r2pred_vs_lambda_by_Kbeta(
+            tidy_df,
+            value_col="R2_pred",
+            cmap="plasma",   # try: "viridis", "plasma", "tab10"
+            filepath=plots_path / "R2_vs_lambda_per_K.png"
+        )
+
+        # Plot maximum predictive R^2 given K_X and K_beta.
+        best_R2_df = save_heatmap_max_r2pred(tidy_df, value_col="R2_pred", cmap="seismic", filepath=plots_path / "best_R2.png")
+
+        # Save this optimization DataFrame.
+        best_R2_df.to_csv(analysis_path / "optimized_per_K.csv", index=False)
+
+        # Plot predictive R^2 vs. df (what ChatGPT considers the coolest info).
+        save_r2pred_vs_df(tidy_df, color_by="K_beta", filepath=plots_path / "R2_vs_df.png")
+
+        # Plot again, but this time just means and standard deviations based on 15 lambda bins.
+        save_binned_r2pred_vs_df(tidy_df, n_bins=15, filepath=plots_path / "R2_vs_df_binned.png")
+
+        # Print progress.
+        print("Done with analysis plot generation! Proceding to repeated CV.")
+
+        ### Repeated CV evaluation.
+        
         # Define hyperparameters for fit.
         lam_grid = 10 ** np.arange(-16, -6, 1.)
         K_X = 30
@@ -70,9 +137,6 @@ def main():
         flr_scores = obj["r2_scores"]
 
     ### Generate and save a CV boxplot comparison.
-
-    plots_path = data_path / "plots"
-    plots_path.mkdir(parents=True, exist_ok=True)
 
     # Load the OLS CV scores.
     with open(
