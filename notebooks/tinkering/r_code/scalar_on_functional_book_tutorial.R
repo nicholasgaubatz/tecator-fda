@@ -43,6 +43,8 @@ plot(tempbetafd, xlab="Day", ylab="Beta for temperature")
 
 # Intercept term.
 coef(betaestlist[[1]])
+# All coefficients.
+coef(betaestlist[[2]])
 
 # Assess the quality of the fit. First, compute residuals and error sums of squares.
 annualprechat1 = fRegressList$yhatfdobj
@@ -106,7 +108,7 @@ Fratio = ((SSE0-SSE1)/1)/(SSE1/33) # 31.3 with 1 and 33 degrees of freedom. Stil
 ###############################
 
 # We plot cross-validation scores for various values of lambda using the hat matrix.
-loglam = seq(1, 15, 0.1)
+loglam = seq(5, 15, 0.5)
 nlam = length(loglam)
 SSE.CV = matrix(0, nlam, 1)
 for (ilam in 1:nlam){
@@ -162,9 +164,10 @@ lines(betafd+2*sqrt(betavar), lty=2, lwd=1)
 lines(betafd-2*sqrt(betavar), lty=2, lwd=1)
 
 ###############################
-# Statistical tests (DOESN'T WORK)
+# Statistical tests
 ###############################
 
+# We test whether the result obtained from our observed data is different than if we permuted the response variable vector.
 F.res = Fperm.fd(annualprec, templist, betalist)
-F.res$Fobs
-F.res$qval
+F.res$Fobs # 3.03, as long as we use the Fourier basis and not the constant basis.
+F.res$qval # Critical value is 0.3, so our result is statistically significant.

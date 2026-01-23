@@ -16,6 +16,10 @@ from tecatorfda.data import load_tecator_fat
 def main():
     # Load the fetched/processed data.
     tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat()
+    
+    # Be explicit in data shapes.
+    X = tecator_df.to_numpy()
+    y = fat_df.to_numpy().ravel()
 
     # Create a directory to save these results to.
     data_path = Path(__file__).parent.parent / "data" / "02_ridge"
@@ -23,11 +27,13 @@ def main():
 
     # If we don't already have 10-repeated 10-fold CV results saved, generate them.
     results_path = data_path / "repeated_cv_results"
-    if not os.path.isdir(results_path):
+    results_file = results_path / "results.pkl"
+    if not results_file.exists():
         # Create this directory.
-        results_path.mkdir(parents=True, exist_ok=False)
+        results_path.mkdir(parents=True, exist_ok=True)
 
-        alphas = np.logspace(-10, 10, 5)
+        # Define hyperparameters for fit.
+        alphas = np.logspace(-10, 10, 201)
 
         # Inner CV: within each fold, standardize according to the train data, then perform CV for alpha on the train data.
         pipe = make_pipeline(
@@ -37,14 +43,14 @@ def main():
         # Outer CV: repeated 10 times, just like in the OLS script.
         outer_cv = RepeatedKFold(n_splits=10, n_repeats=10, random_state=0)
         scores = cross_val_score(
-            pipe, tecator_df.values, fat_df.values, cv=outer_cv, scoring="r2"
+            pipe, X, y, cv=outer_cv, scoring="r2"
         )
 
         # Save all 100 scores.
-        with open(results_path / "results.pkl", "wb") as f:
+        with open(results_file, "wb") as f:
             pickle.dump(scores, f)
     else:
-        with open(results_path / "results.pkl", "rb") as f:
+        with open(results_file, "rb") as f:
             scores = pickle.load(f)
 
     ### Generate and save a CV boxplot comparison.
