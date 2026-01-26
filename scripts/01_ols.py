@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 import pickle
 
@@ -11,12 +12,19 @@ from tecatorfda.data import load_tecator_fat
 
 
 def main():
+    # Parse the arguments to the script.
+    p = argparse.ArgumentParser()
+    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument("--data-location-directory", type=Path, required=True)
+    args = p.parse_args()
+    
     # Load the fetched/processed data.
-    tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat()
+    data_path = args.data_location_directory.expanduser().resolve()
+    tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat(location=data_path)
 
-    # Create a directory to save these results to.
-    data_path = Path(__file__).parent.parent / "data" / "01_ols"
-    data_path.mkdir(parents=True, exist_ok=True)
+    # Create a directory to save these results to from the arguments.
+    output_path = args.out_dir.expanduser().resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
 
     # Compute OLS on the entire data set.
     results_full = perform_ols(tecator_df.values, fat_df.values)
@@ -33,7 +41,7 @@ def main():
 
     ### Save all the results to data/01_ols/results.
 
-    results_path = data_path / "results"
+    results_path = output_path / "results"
     results_path.mkdir(parents=True, exist_ok=True)
 
     all_results = {
@@ -50,7 +58,7 @@ def main():
 
     ### Save some important plots to data/01_ols/plots.
 
-    plots_path = data_path / "plots"
+    plots_path = output_path / "plots"
     plots_path.mkdir(parents=True, exist_ok=True)
 
     for key in all_results.keys():

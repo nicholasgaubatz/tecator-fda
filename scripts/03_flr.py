@@ -1,10 +1,11 @@
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
+import argparse
 import os
 from pathlib import Path
 import pickle
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 import skfda
 from skfda.misc.operators import LinearDifferentialOperator
 from skfda.misc.regularization import L2Regularization
@@ -30,22 +31,33 @@ from tecatorfda.fda_models import (
 )
 
 def main():
+    # Parse the arguments to the script.
+    p = argparse.ArgumentParser()
+    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument("--data-location-directory", type=Path, required=True)
+    args = p.parse_args()
+    
     # Load the fetched/processed data.
-    _, fat_df, _, _ = load_tecator_fat()
-    tecator_fdatagrid, _ = skfda.datasets.fetch_tecator(return_X_y=True, as_frame=False)
+    data_path = args.data_location_directory.expanduser().resolve()
+    tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat(location=data_path)
+
+    # Create a directory to save these results to from the arguments.
+    output_path = args.out_dir.expanduser().resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Put the Tecator DataFrame in FDataGrid format.
+    # tecator_fdatagrid, _ = skfda.datasets.fetch_tecator(return_X_y=True, as_frame=False)
+    tecator_fdatagrid = skfda.FDataGrid(data_matrix=tecator_df.to_numpy(dtype=float), grid_points=wavelength_grid)
 
     # Be explicit in data shapes.
     fat = fat_df.values.flatten()
 
-    # Create a directory to save these results to.
-    data_path = Path(__file__).parent.parent / "data" / "03_flr"
-    data_path.mkdir(parents=True, exist_ok=True)
 
     # Define the paths we use throughout.
-    analysis_path = data_path / "analysis_results"
-    results_path = data_path / "repeated_cv_results"
+    analysis_path = output_path / "analysis_results"
+    results_path = output_path / "repeated_cv_results"
     results_file = results_path / "results.pkl"
-    plots_path = data_path / "plots"
+    plots_path = output_path / "plots"
 
     # If we don't already have results saved, generate them.
     if not results_file.exists():
@@ -143,7 +155,8 @@ def main():
         str(
             (
                 Path(__file__).parent.parent
-                / "data"
+                / "artifacts"
+                / "original_data"
                 / "01_ols"
                 / "results"
                 / "ols_cv.pkl"
@@ -158,7 +171,8 @@ def main():
         str(
             (
                 Path(__file__).parent.parent
-                / "data"
+                / "artifacts"
+                / "original_data"
                 / "02_ridge"
                 / "repeated_cv_results"
                 / "results.pkl"

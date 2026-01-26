@@ -1,7 +1,9 @@
-import numpy as np
+import argparse
 import os
 from pathlib import Path
 import pickle
+
+import numpy as np
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import RepeatedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
@@ -14,19 +16,26 @@ from tecatorfda.data import load_tecator_fat
 
 
 def main():
-    # Load the fetched/processed data.
-    tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat()
+    # Parse the arguments to the script.
+    p = argparse.ArgumentParser()
+    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument("--data-location-directory", type=Path, required=True)
+    args = p.parse_args()
     
+    # Load the fetched/processed data.
+    data_path = args.data_location_directory.expanduser().resolve()
+    tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat(location=data_path)
+
+    # Create a directory to save these results to from the arguments.
+    output_path = args.out_dir.expanduser().resolve()
+    output_path.mkdir(parents=True, exist_ok=True)
+
     # Be explicit in data shapes.
     X = tecator_df.to_numpy()
     y = fat_df.to_numpy().ravel()
 
-    # Create a directory to save these results to.
-    data_path = Path(__file__).parent.parent / "data" / "02_ridge"
-    data_path.mkdir(parents=True, exist_ok=True)
-
     # If we don't already have 10-repeated 10-fold CV results saved, generate them.
-    results_path = data_path / "repeated_cv_results"
+    results_path = output_path / "repeated_cv_results"
     results_file = results_path / "results.pkl"
     if not results_file.exists():
         # Create this directory.
@@ -55,14 +64,15 @@ def main():
 
     ### Generate and save a CV boxplot comparison.
 
-    plots_path = data_path / "plots"
+    plots_path = output_path / "plots"
     plots_path.mkdir(parents=True, exist_ok=True)
 
     with open(
         str(
             (
                 Path(__file__).parent.parent
-                / "data"
+                / "artifacts"
+                / "original_data"
                 / "01_ols"
                 / "results"
                 / "ols_cv.pkl"

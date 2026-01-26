@@ -15,6 +15,8 @@ notebooks/tinkering/
 
 # Data
 data/
+data_1/
+artifacts/
 
 # IDE
 .vscode/
