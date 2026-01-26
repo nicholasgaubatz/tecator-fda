@@ -102,7 +102,7 @@ def load_tecator_fat(
     return tecator_df, fat_df, wavelength_grid, wavelength_unit
 
 
-def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_location, alpha, random_seed):
+def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_location, random_seed, alpha=0., row_idx=None, col_idx=None):
     location = original_data_location.resolve()
     new_data_location = new_data_location.resolve()
 
@@ -111,12 +111,44 @@ def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_lo
     tecator_df = pd.read_csv(location / "tecator.csv")
     fat_df = pd.read_csv(location / "fat.csv")
 
+    # If requested, take the subset of rows.
+    if row_idx is not None:
+        tecator_df = tecator_df.iloc[row_idx]
+        fat_df = fat_df.iloc[row_idx]
+
+    # Open up metadata.
     with open(location / "metadata.json", "r") as f:
         metadata = json.load(f)
     wavelength_grid = metadata["wavelengths"]
     wavelength_unit = metadata["wavelength_unit"]
 
-    noisy_tecator_df = add_gaussian_noise_per_column(df=tecator_df, alpha=alpha, random_seed=random_seed)
+    # If requested, take the subset of columns.
+    if col_idx is not None:
+        # allow either positional indices/mask/slice or explicit column names
+        if isinstance(col_idx, (slice, list, tuple, np.ndarray)) and not (
+            isinstance(col_idx, (list, tuple, np.ndarray)) and len(col_idx) > 0 and isinstance(col_idx[0], str)
+        ):
+            tecator_df = tecator_df.iloc[:, col_idx]
+        else:
+            tecator_df = tecator_df.loc[:, col_idx]
+
+        # if they subset by names, map names -> positions; if by positions, use directly
+        if not (isinstance(col_idx, (slice, list, tuple, np.ndarray)) and not (
+            isinstance(col_idx, (list, tuple, np.ndarray)) and len(col_idx) > 0 and isinstance(col_idx[0], str)
+        )):
+            # column names case
+            col_pos = [tecator_df.columns.get_loc(c) for c in tecator_df.columns]
+        else:
+            # positional case already applied; positions are 0..n_selected-1 now
+            col_pos = np.arange(tecator_df.shape[1])
+
+        wavelength_grid = np.asarray(wavelength_grid)[col_pos].tolist()
+
+    # Add the noise, if requested.
+    if alpha != 0.:
+        noisy_tecator_df = add_gaussian_noise_per_column(df=tecator_df, alpha=alpha, random_seed=random_seed)
+    else:
+        noisy_tecator_df = tecator_df.copy()
 
     # Create a metadata dict for the grid.
     grid_metadata = {
@@ -126,8 +158,13 @@ def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_lo
         "n_grid": noisy_tecator_df.shape[1],
         "wavelengths": list(wavelength_grid),
         "wavelength_unit": "nm",
-        "notes": "100-point discretization per sample",
+        "notes": f"{len(list(wavelength_grid))}-point discretization per sample; "
+                 f"row_idx={row_idx is not None}; col_idx={col_idx is not None}",
     }
+
+    # Reset indices to keep things clean.
+    noisy_tecator_df = noisy_tecator_df.reset_index(drop=True)
+    fat_df = fat_df.reset_index(drop=True)
 
     # Save the data.
     noisy_tecator_df.to_csv(new_data_location / "tecator.csv", index=False)
