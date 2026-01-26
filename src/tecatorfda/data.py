@@ -100,3 +100,58 @@ def load_tecator_fat(
     wavelength_unit = metadata["wavelength_unit"]
 
     return tecator_df, fat_df, wavelength_grid, wavelength_unit
+
+
+def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_location, alpha, random_seed):
+    location = original_data_location.resolve()
+    new_data_location = new_data_location.resolve()
+
+    new_data_location.mkdir(parents=True, exist_ok=True)
+
+    tecator_df = pd.read_csv(location / "tecator.csv")
+    fat_df = pd.read_csv(location / "fat.csv")
+
+    with open(location / "metadata.json", "r") as f:
+        metadata = json.load(f)
+    wavelength_grid = metadata["wavelengths"]
+    wavelength_unit = metadata["wavelength_unit"]
+
+    noisy_tecator_df = add_gaussian_noise_per_column(df=tecator_df, alpha=alpha, random_seed=random_seed)
+
+    # Create a metadata dict for the grid.
+    grid_metadata = {
+        "dataset": f"Tecator with noise level {alpha}",
+        "source": "https://lib.stat.cmu.edu/datasets/tecator",
+        "n_samples": noisy_tecator_df.shape[0],
+        "n_grid": noisy_tecator_df.shape[1],
+        "wavelengths": list(wavelength_grid),
+        "wavelength_unit": "nm",
+        "notes": "100-point discretization per sample",
+    }
+
+    # Save the data.
+    noisy_tecator_df.to_csv(new_data_location / "tecator.csv", index=False)
+    fat_df.to_csv(new_data_location / "fat.csv", index=False)
+    with open(new_data_location / "metadata.json", "w") as f:
+        json.dump(grid_metadata, f, indent=4)
+
+    return noisy_tecator_df, fat_df, wavelength_grid, wavelength_unit
+
+
+def add_gaussian_noise_per_column(df, alpha, random_seed):
+    """Add noise to functional data based on columnwise std. Alpha controls the level of noise.
+
+    Args:
+        X (_type_): _description_
+        alpha (_type_): _description_
+        random_seed (_type_): _description_
+    """
+    X = df.to_numpy(dtype=float)
+    rng = np.random.default_rng(random_seed)
+    sd = X.std(axis=0, ddof=1) # Shape (n_grid,)
+    noise = rng.normal(0.0, alpha * sd, size=X.shape)
+
+    result = df.copy()
+    result.loc[:, :] = X + noise
+
+    return result

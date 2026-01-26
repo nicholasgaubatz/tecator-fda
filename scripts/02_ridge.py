@@ -20,10 +20,12 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out-dir", type=Path, required=True)
     p.add_argument("--data-location-directory", type=Path, required=True)
+    p.add_argument("--artifacts-location-directory", type=Path, required=True)
     args = p.parse_args()
     
     # Load the fetched/processed data.
     data_path = args.data_location_directory.expanduser().resolve()
+    artifacts_path = args.artifacts_location_directory.expanduser().resolve()
     tecator_df, fat_df, wavelength_grid, wavelength_unit = load_tecator_fat(location=data_path)
 
     # Create a directory to save these results to from the arguments.
@@ -70,9 +72,7 @@ def main():
     with open(
         str(
             (
-                Path(__file__).parent.parent
-                / "artifacts"
-                / "original_data"
+                artifacts_path
                 / "01_ols"
                 / "results"
                 / "ols_cv.pkl"
