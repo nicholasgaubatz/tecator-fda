@@ -102,7 +102,14 @@ def load_tecator_fat(
     return tecator_df, fat_df, wavelength_grid, wavelength_unit
 
 
-def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_location, random_seed, alpha=0., row_idx=None, col_idx=None):
+def generate_and_load_tecator_data_iid_noise(original_data_location, 
+                                             new_data_location, 
+                                             random_seed, 
+                                             alpha=0., 
+                                             row_idx=None, 
+                                             col_idx=None, 
+                                             perm_cols=False, 
+                                             perm_cols_per_sample=False,):
     location = original_data_location.resolve()
     new_data_location = new_data_location.resolve()
 
@@ -150,6 +157,21 @@ def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_lo
     else:
         noisy_tecator_df = tecator_df.copy()
 
+    # Permute the columns across the data set, if requested.
+    if perm_cols:
+        rng = np.random.default_rng(0)
+        perm_cols = rng.permutation(noisy_tecator_df.columns)
+        noisy_tecator_df = noisy_tecator_df.loc[:, perm_cols]
+
+    # Permute the columns for each functional input X(t), if requested.
+    if perm_cols_per_sample:
+        rng = np.random.default_rng(0)
+        noisy_tecator_df = noisy_tecator_df.apply(
+            lambda row: row.iloc[rng.permutation(len(row))].to_numpy(),
+            axis=1,
+            result_type="expand",
+        )
+
     # Create a metadata dict for the grid.
     grid_metadata = {
         "dataset": f"Tecator with noise level {alpha}",
@@ -159,7 +181,10 @@ def generate_and_load_tecator_data_iid_noise(original_data_location, new_data_lo
         "wavelengths": list(wavelength_grid),
         "wavelength_unit": "nm",
         "notes": f"{len(list(wavelength_grid))}-point discretization per sample; "
-                 f"row_idx={row_idx is not None}; col_idx={col_idx is not None}",
+                 f"row_idx={row_idx is not None}; col_idx={col_idx is not None}; "
+                 f"perm_cols={perm_cols}; "
+                 f"perm_cols_per_sample={perm_cols_per_sample}; "
+                 f"random_seed={random_seed}; ",
     }
 
     # Reset indices to keep things clean.
