@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 from sklearn.model_selection import GridSearchCV, RepeatedKFold, cross_val_score
-from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
 
 from tecatorfda.all_models import (
     plot_and_save_cv_boxplots,
@@ -42,8 +42,8 @@ def main():
         results_path.mkdir(parents=True, exist_ok=True)
         plots_path.mkdir(parents=True, exist_ok=True)
 
-        # Define some basic random forest hyperparameters for a baseline comparison.
-        rf = RandomForestRegressor(
+        # Define some basic XGBoost hyperparameters for a baseline comparison.
+        rf = XGBRegressor(
             n_estimators=100,
             random_state=0,
             n_jobs=1,
@@ -51,8 +51,8 @@ def main():
 
         # Define a small grid to search over.
         param_grid = {
-             "max_features": ["sqrt", 0.3, 0.5],
-             "min_samples_leaf": [1, 5, 10],
+             "colsample_bytree": ["sqrt", 0.3, 0.5],
+             "min_child_weight": [1, 5, 10],
         }
 
         # Inner CV: performed once.
@@ -119,9 +119,22 @@ def main():
         "rb") as f:
             flr_scores = pickle.load(f)["r2_scores"]
 
+    # Load the RF CV scores.
+    with open(
+        str(
+            (
+                artifacts_path
+                / "06_rf"
+                / "repeated_cv_results"
+                / "results.pkl"
+            )
+        ),
+        "rb") as f:
+            rf_scores = pickle.load(f)
+
     plot_and_save_cv_boxplots(
-        all_scores=[ols_cv_scores, ridge_scores, flr_scores, scores],
-        model_names=["OLS", "Ridge", "FLR", "RF"],
+        all_scores=[ols_cv_scores, ridge_scores, flr_scores, rf_scores, scores],
+        model_names=["OLS", "Ridge", "FLR", "RF", "XGB"],
         filepath=plots_path / "comparison.png",
     )
 
